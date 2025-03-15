@@ -6,15 +6,13 @@ tau = 2 : Integer // Index in f^tau_{d,n}, one of factors determining the DRGB s
 n_bar = 7 : Integer // Number of columns of the secret matrix to compute B.
 d = 594 : Integer // Number of polynomial coeﬃcients per public matrix row.
 
-type pk_byte = [5124]byte // Public key's size = 5124 byes.
-type sk_byte = [16]byte // Secret key's size = 16 bytes.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type q = 8192 // Modulus (2^13). q_bits = 13.
 type q_byte = [13]
 type p_byte = [10]
 type byte = [8]
 type sigma_byte = [16]byte
-type pk_byte = [5124]byte // Public key's size = 5124 byes.
+type pk_byte = [5214]byte // Public key's size = 5214 byes.
 type sk_byte = [16]byte //Secret key's size = 16 bytes.
 type Tq = (Z q)
 type h = 238
