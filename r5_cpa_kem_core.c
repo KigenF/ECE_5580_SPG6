@@ -12,6 +12,7 @@
 #define q 8192
 #define n_bar 7
 #define h 238
+#define nr_bits 10
 
 #define SHAKE128_RATE 168
 #define SHAKE256_RATE 136
@@ -24,6 +25,10 @@
     (((x) & 0x00FFU) << 8)    \
 )
 #endif
+
+#define ROUND(x) ((int)(x + 0.5))
+#define CEIL_DIV(a,b) ((a+b-1)/b)
+#define BITS_TO_BYTES(b) (CEIL_DIV(b,8))
 
 typedef cSHAKE_Instance cshake_ctx;
 
@@ -238,4 +243,67 @@ void create_S_T(uint8_t * in, uint16_t * out) {
     for (i = 0; i < n_bar; ++i) {
         create_secret_vector(&S_T[i * len], len);
     }
+}
+
+size_t pack(unsigned char *packed, const uint16_t *m, const size_t els) {
+    const size_t packed_len = (size_t) (BITS_TO_BYTES(els * nr_bits));
+    const uint16_t mask = (uint16_t) ((1 << nr_bits) - 1);
+    size_t i;
+    uint16_t val;
+    size_t bits_done = 0;
+    size_t idx;
+    size_t bit_idx;
+
+    memset(packed, 0, packed_len);
+    if (nr_bits == 8) {
+        for (i = 0; i < els; ++i) {
+            packed[i] = (uint8_t) m[i];
+        }
+    } else {
+        for (i = 0; i < els; ++i) {
+            idx = bits_done >> 3;
+            bit_idx = bits_done & 7;
+            val = m[i] & mask;
+            packed[idx] = (uint8_t) (packed[idx] | (val << bit_idx));
+            if (bit_idx + nr_bits > 8) {
+                /* Spill over to next packed byte */
+                packed[idx + 1] = (uint8_t) (packed[idx + 1] | (val >> (8 - bit_idx)));
+                if (bit_idx + nr_bits > 16) {
+                    /* Spill over to next packed byte */
+                    packed[idx + 2] = (uint8_t) (packed[idx + 2] | (val >> (16 - bit_idx)));
+                }
+            }
+            bits_done += nr_bits;
+        }
+    }
+
+    return packed_len;
+}
+
+void pack_pk(uint8_t * in0, uint16_t * in1, uint8_t * out) {
+    size_t packed_idx = 0;
+	unsigned char * packed_pk = out;
+	unsigned char * sigma = in0;
+	uint16_t *B = in1;
+
+	/*printf("B = \n[");
+	for(size_t i = 0; i < d * n_bar; i ++)
+	{
+		if(i % 8 == 0 && i > 0) printf("\n ");
+		printf("0x%04x, ", *(B + i));
+	}
+	printf("]\n");*/
+
+    /* Pack sigma */
+    memcpy(packed_pk + packed_idx, sigma, kappa_bytes);
+    packed_idx += kappa_bytes;
+    /* Pack B */
+    packed_idx += pack((packed_pk + packed_idx), B, d * n_bar);
+	/*printf("packed_pk: \n[");
+	for(int i = 0; i < 5214; i ++)
+	{
+		if(i > 0 && i % 7 == 0) printf("\n ");
+		printf("0x%04x, ", *(packed_pk + i));
+	}
+	printf("]\n");*/
 }
