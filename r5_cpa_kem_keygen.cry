@@ -14,8 +14,6 @@ type q_byte = [13]
 type p_byte = [10]
 type byte = [8]
 type sigma_byte = [16]byte
-type pk_byte = [5124]byte // Public key's size = 5124 byes.
-type sk_byte = [16]byte //Secret key's size = 16 bytes.
 type Tq = (Z q)
 type h = 238
 
