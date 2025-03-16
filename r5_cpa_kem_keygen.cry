@@ -3,39 +3,48 @@ module r5_cpa_kem_keygen where
 // Parameters for R5N1_1CPA_0d
 p = 1024 : Integer // Message modulus (2^10). p_bits = 10.
 tau = 2 : Integer // Index in f^tau_{d,n}, one of factors determining the DRGB scheme.
-n_bar = 7 : Integer // Number of columns of the secret matrix to compute B.
-d = 594 : Integer // Number of polynomial coeﬃcients per public matrix row.
 
+type d = 594 //// Number of polynomial coefficients per public matrix row.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type q = 8192 // Modulus (2^13). q_bits = 13.
+type n_bar = 7 // Number of columns of the secret matrix to compute B.
 type q_byte = [13]
 type p_byte = [10]
 type byte = [8]
+type hex = [16]
 type sigma_byte = [16]byte
 type pk_byte = [5214]byte // Public key's size = 5214 byes.
 type sk_byte = [16]byte //Secret key's size = 16 bytes.
 type Tq = (Z q)
 type h = 238
+type kappa = 16
 
 /*
 r5_cpa_kem_keygen : sigma_byte -> (pk_byte, sk_byte)
 r5_cpa_kem_keygen sigma = (pk, sk)
     where
         (pk, sk) = r5_cpa_pke_keygen sigma
+*/
 
-r5_cpa_pke_keygen : sigma_byte -> (pk_byte, sk_byte)
-r5_cpa_pke_keygen sigma = (pk, sk)
+/*
+r5_cpa_pke_keygen : sigma_byte -> sk_byte -> (pk_byte, sk_byte)
+r5_cpa_pke_keygen sigma sk = (pk, sk)
     where
         A = create_A sigma
-        sk = randombytes kappa_byte
         S_T = create_S_T sk
         S = transpose_matrix S_T
         B = mult_matrix A, S
         B = round_matrix B
-        pk = pack_pk B sigma
-*/
+        pk = pack_pk B sigma*/
 
-transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]byte -> [col][row]byte
+/*Testing functions*/
+// show_sigma sigma = sigma
+// foreign create_A_master : sigma_byte -> [2048 + d]hex
+
+foreign create_A : sigma_byte -> [d/n][d/n]hex
+foreign create_S_T : sk_byte -> [n_bar][d]hex
+
+transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]hex -> [col][row]hex
 transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
 
 round_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) =>
@@ -50,7 +59,8 @@ dotVecVec v1 v2 = sum (zipWith (*) v1 v2)
 dotMatVec : {k1,k2} (fin k1, fin k2) => [k1][k2]Tq -> [k2]Tq -> [k1]Tq
 dotMatVec matrix vector = [dotVecVec v1 vector | v1 <- matrix]
 
-dotMatMat :{k1,k2,k3} (fin k1, fin k2, fin k3) =>
+dotMatMat : {k1,k2,k3} (fin k1, fin k2, fin k3) =>
     [k1][k2]Tq -> [k2][k3]Tq -> [k1][k3]Tq
 dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
     where m' = transpose matrix2
+

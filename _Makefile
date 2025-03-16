@@ -1,0 +1,17 @@
+# Compiler setup
+CC      = gcc
+XKCP_PATH = <your XKCP path>
+CFLAGS  = -fwrapv -I$(XKCP_PATH)/bin/generic64/libkeccak.a.headers -shared
+LDLIBS  = -lcrypto -L$(XKCP_PATH)/bin/generic64 -lkeccak -lm
+SO_FILE_NAME = r5_cpa_kem_keygen
+FILE_NAME = r5_cpa_kem_core
+
+# Build the application to generate the KATs
+r5_cpa_kem_core:
+	$(CC) $(CFLAGS) $(FILE_NAME).c $(LDLIBS) -o $(SO_FILE_NAME).so
+
+# Clean build artefact
+clean:
+	rm -f $(SO_FILE_NAME).so
+
+.PHONY: clean
