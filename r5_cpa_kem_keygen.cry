@@ -8,8 +8,9 @@ type d = 594 //// Number of polynomial coefficients per public matrix row.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type q = 8192 // Modulus (2^13). q_bits = 13.
 type n_bar = 7 // Number of columns of the secret matrix to compute B.
-type q_byte = [13]
-type p_byte = [10]
+type q_bits = [13]
+type p_val = 10
+type p_bits = [10]
 type byte = [8]
 type hex = [16]
 type sigma_byte = [16]byte
@@ -19,48 +20,50 @@ type Tq = (Z q)
 type h = 238
 type kappa = 16
 
-/*
-r5_cpa_kem_keygen : sigma_byte -> (pk_byte, sk_byte)
-r5_cpa_kem_keygen sigma = (pk, sk)
-    where
-        (pk, sk) = r5_cpa_pke_keygen sigma
-*/
 
-/*
+r5_cpa_kem_keygen : sigma_byte -> sk_byte -> (pk_byte, sk_byte)
+r5_cpa_kem_keygen sigma _sk = (pk, sk)
+    where
+        (pk, sk) = r5_cpa_pke_keygen sigma _sk
+
 r5_cpa_pke_keygen : sigma_byte -> sk_byte -> (pk_byte, sk_byte)
-r5_cpa_pke_keygen sigma sk = (pk, sk)
+r5_cpa_pke_keygen sigma _sk = (pk, sk)
     where
         A = create_A sigma
         S_T = create_S_T sk
         S = transpose_matrix S_T
-        B = mult_matrix A, S
-        B = round_matrix B
-        pk = pack_pk B sigma*/
+        B = dotMatMat A S
+        B_b = round_matrix B
+        pk = pack_pk sigma B_b
+        sk = _sk
 
 /*Testing functions*/
 // show_sigma sigma = sigma
 // foreign create_A_master : sigma_byte -> [2048 + d]hex
 
-foreign create_A : sigma_byte -> [d/n][d/n]hex
-foreign create_S_T : sk_byte -> [n_bar][d]hex
+foreign create_A : sigma_byte -> [d/n][d/n]q_bits
+foreign create_S_T : sk_byte -> [n_bar][d]q_bits
+foreign pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
 
-transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]hex -> [col][row]hex
+transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]q_bits -> [col][row]q_byte
 transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
 
-round_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) =>
-    [row][col]q_byte -> [row][col]p_byte
-round_matrix A = [[round_element (elm + `(h)) | elm <- row] | row <- A]
+round_matrix :
+    [d][n_bar]q_bits -> [d][n_bar]p_bits
+round_matrix A = [[round_element (elm) | elm <- row] | row <- A]
 
-round_element x = [x @ i | i <- [0 .. 9]] // Hard coded parameters: [0..9] = q_byte - p_byte
+round_element x = drop`{3}((x + 4) >> 3)
 
-dotVecVec : {k1} (fin k1) => [k1]Tq -> [k1]Tq -> Tq
-dotVecVec v1 v2 = sum (zipWith (*) v1 v2)
+dotVecVec : [d/n]q_bits -> [d/n]q_bits -> q_bits
+dotVecVec v1 v2 = (sum (zipWith (*) v1 v2) && (8191))
 
-dotMatVec : {k1,k2} (fin k1, fin k2) => [k1][k2]Tq -> [k2]Tq -> [k1]Tq
+dotMatVec : [d/n][d/n]q_bits -> [d]q_bits -> [d/n]q_bits
 dotMatVec matrix vector = [dotVecVec v1 vector | v1 <- matrix]
 
-dotMatMat : {k1,k2,k3} (fin k1, fin k2, fin k3) =>
-    [k1][k2]Tq -> [k2][k3]Tq -> [k1][k3]Tq
+dotMatMat : /*{k1,k2,k3} (fin k1, fin k2, fin k3) =>*/
+    [d/n][d/n]q_bits -> [d][n_bar]q_bits -> [d][n_bar]q_bits
 dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
     where m' = transpose matrix2
 
+/*pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
+pack_pk sigma B = (sigma # split (join (join (map (map reverse) B))))*/
