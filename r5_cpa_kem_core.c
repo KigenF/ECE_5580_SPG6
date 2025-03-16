@@ -10,6 +10,8 @@
 #define k 594 // k = d/n.
 #define kappa_bytes 16
 #define q 8192
+#define n_bar 7
+#define h 238
 
 #define SHAKE128_RATE 168
 #define SHAKE256_RATE 136
@@ -190,4 +192,50 @@ void create_A(uint8_t *sigma, uint16_t *A) {
 	/* Free allocated memory */
 	free(A_master);
 	free(A_permutation);
+}
+
+void drbg_init(const void *seed, const size_t seed_size) {
+    drbg_init_customization(seed, seed_size, NULL, 0);
+}
+
+uint16_t drbg_sampler16(const uint32_t range) {
+    const uint32_t range_divisor = (uint32_t) (0x10000 / range); \
+    const uint32_t range_limit = range * range_divisor;
+    uint16_t rnd;
+    do {
+        drbg(&rnd, sizeof (rnd));
+        rnd = (uint16_t) LITTLE_ENDIAN16(rnd);
+    } while (rnd >= range_limit);
+    rnd = (uint16_t) (rnd / range_divisor);
+    return rnd;
+}
+
+static int create_secret_vector(int16_t *vector, const uint16_t len) {
+    size_t i;
+    uint16_t idx;
+    memset(vector, 0, sizeof (*vector) * len);
+
+    for (i = 0; i < h; ++i) {
+        do {
+            idx = drbg_sampler16(len);
+        } while (vector[idx] != 0);
+        vector[idx] = (i & 1) ? -1 : 1;
+    }
+
+    return 0;
+}
+
+void create_S_T(uint8_t * in, uint16_t * out) {
+    size_t i;
+    const uint16_t len = (uint16_t) (k * n);
+	uint8_t *sk = in;
+	int16_t *S_T = out;
+
+    /* Initialize drbg */
+    drbg_init(sk, kappa_bytes);
+
+    /* Create rows of sparse vectors */
+    for (i = 0; i < n_bar; ++i) {
+        create_secret_vector(&S_T[i * len], len);
+    }
 }
