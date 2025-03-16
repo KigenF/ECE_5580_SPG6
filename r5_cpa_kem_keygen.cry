@@ -13,7 +13,7 @@ type p_byte = [10]
 type byte = [8]
 type hex = [16]
 type sigma_byte = [16]byte
-type pk_byte = [5214]byte // Public key's size = 5214 byes.
+type pk_byte = [5124]byte // Public key's size = 5124 byes.
 type sk_byte = [16]byte //Secret key's size = 16 bytes.
 type Tq = (Z q)
 type h = 238
@@ -35,6 +35,12 @@ r5_cpa_pke_keygen sigma = (pk, sk)
         B = round_matrix B
         pk = pack_pk B sigma
         */
+
+/*Testing functions*/
+// show_sigma sigma = sigma
+// foreign create_A_master : sigma_byte -> [2048 + d]hex
+
+foreign create_A : sigma_byte -> [d/n][d/n]hex
 
 transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]byte -> [col][row]byte
 transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
