@@ -39,3 +39,6 @@ unpack_pk pk = ( sigma, B )
     sigma = take 16 pk
     rest  = drop 16 pk
     B     = split rest
+
+foreign create_R_T : rho_byte -> [m_bar][d]q_bits
+

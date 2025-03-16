@@ -11,6 +11,7 @@
 #define kappa_bytes 16
 #define q 8192
 #define n_bar 7
+#define m_bar 7
 #define h 238
 #define nr_bits 10
 
@@ -306,4 +307,19 @@ void pack_pk(uint8_t * in0, uint16_t * in1, uint8_t * out) {
 		printf("0x%04x, ", *(packed_pk + i));
 	}
 	printf("]\n");*/
+}
+
+void create_R_T(uint8_t * in, uint16_t * out) {
+    size_t i;
+    const uint16_t len = (uint16_t) (k * n);
+	uint8_t *rho = in;
+	int16_t *R_T = out;
+
+    /* Initialize drbg */
+    drbg_init(rho, kappa_bytes);
+
+    /* Create rows of sparse vectors */
+    for (i = 0; i < m_bar; ++i) {
+        create_secret_vector(&R_T[i * len], len);
+    }
 }
