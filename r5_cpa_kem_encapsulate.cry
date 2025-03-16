@@ -1,0 +1,41 @@
+module r5_cpa_kem_encapsulate where
+
+import r5_cpa_kem_keygen
+
+type m_byte = [16]byte //m's size = 16 bytes.
+type rho_byte = [16]byte //rho's size = 16 bytes.
+type ct_byte = [5236]byte
+
+/*
+r5_cpa_kem_encapsulate : pk_byte -> m_byte -> rho_byte -> (ct_byte, k_byte)
+r5_cpa_kem_encapsulate pk m rho= (ct, k)
+    where
+        ct = r5_cpa_pke_encrypt pk, m, rho
+        k = hash
+*/
+
+/*
+r5_cpa_pke_encrypt : pk_byte-> m_byte -> rho_byte -> (ct_byte)
+r5_cpa_pke_encrypt sigma sk = (pk, sk)
+    where
+        sigma B = unpack_pk pk
+        A = create_A sigma
+        R_T = create_R_T rho
+        A_T = transpose_matrix A
+        R = transpose_matrix R_T
+        U = round_matrix U
+        B_T = transpose_matrix B
+        X = mult_matrix
+        x = round_matrix
+        m1 = xef_compute m
+        v = add_msg mu x
+        ct = pack_ct
+        */
+
+
+unpack_pk : pk_byte -> (sigma_byte, [d][n_bar]q_bits)
+unpack_pk pk = ( sigma, B )
+  where
+    sigma = take 16 pk
+    rest  = drop 16 pk
+    B     = split rest
