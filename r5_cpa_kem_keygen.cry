@@ -8,7 +8,6 @@ type d = 594 //// Number of polynomial coefficients per public matrix row.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type q = 8192 // Modulus (2^13). q_bits = 13.
 type n_bar = 7 // Number of columns of the secret matrix to compute B.
-type m_bar = 7
 type q_bits = [13]
 type p_val = 10
 type p_bits = [10]
@@ -46,7 +45,7 @@ foreign create_A : sigma_byte -> [d/n][d/n]q_bits
 foreign create_S_T : sk_byte -> [n_bar][d]q_bits
 foreign pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
 
-transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]q_bits -> [col][row]q_bits
+transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]q_bits -> [col][row]q_byte
 transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
 
 round_matrix :
