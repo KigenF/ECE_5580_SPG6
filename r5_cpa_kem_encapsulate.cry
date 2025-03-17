@@ -5,6 +5,9 @@ import r5_cpa_kem_keygen
 type m_byte = [16]byte //m's size = 16 bytes.
 type rho_byte = [16]byte //rho's size = 16 bytes.
 type ct_byte = [5236]byte
+type mu = 6
+type t_bits = 7
+type b_bits = 3
 
 /*
 r5_cpa_kem_encapsulate : pk_byte -> m_byte -> rho_byte -> (ct_byte, k_byte)
@@ -16,29 +19,63 @@ r5_cpa_kem_encapsulate pk m rho= (ct, k)
 
 /*
 r5_cpa_pke_encrypt : pk_byte-> m_byte -> rho_byte -> (ct_byte)
-r5_cpa_pke_encrypt sigma sk = (pk, sk)
+r5_cpa_pke_encrypt pk m rho = ct
     where
         sigma B = unpack_pk pk
         A = create_A sigma
         R_T = create_R_T rho
         A_T = transpose_matrix A
         R = transpose_matrix R_T
-        U = round_matrix U
+        U = dotMatMat A_T R
+        U = round_matrix_h2 U
         B_T = transpose_matrix B
-        X = mult_matrix
-        x = round_matrix
-        m1 = xef_compute m
-        v = add_msg mu x
-        ct = pack_ct
+        X = dotMatMat B_T R
+        x = round_matrix_mu X
+        v = add_msg x m
+        ct = pack_ct U v
         */
 
 
 unpack_pk : pk_byte -> (sigma_byte, [d][n_bar]q_bits)
 unpack_pk pk = ( sigma, B )
-  where
-    sigma = take 16 pk
-    rest  = drop 16 pk
-    B     = split rest
+    where
+        sigma = take 16 pk
+        rest  = drop 16 pk
+        B     = split rest
 
 foreign create_R_T : rho_byte -> [m_bar][d]q_bits
 
+round_matrix_h2 :
+    [d/n][m_bar]q_bits -> [d/n][m_bar]p_bits
+round_matrix_h2 A = [[round_element (elm) | elm <- row] | row <- A]
+
+
+round_matrix_mu :
+    [n_bar][m_bar]p_bits -> [1][mu]t_bits
+round_matrix_mu A = [[ round_element elm | elm <- take 6 (head A) ]]
+
+
+add_msg : {mu, t_bits, b_bits} (mu * b_bits <= 128, b_bits <= t_bits) =>
+    [1][mu]t_bits -> m_byte -> [1][mu]t_bits
+add_msg x m = [ [ (row @ i + [0..7-3] # (msg @ i)) % (2 ^ 7)
+                | i <- [0 .. 6 - 1] ]
+              ]
+    where
+        row = head x
+        msg = split (take (6 * 3) m) : [6][3]
+
+pack_ct : [d/n][m_bar]p_bits -> [1][mu]t_bits -> ct_byte
+pack_ct U v = packBytes packed
+    where
+        packedU : [((d / n) * m_bar * p_bits)]Bit
+        packedU = join [ join [ reverse elm | elm <- row ] | row <- U ]
+
+        packedV : [(6 * 7)]Bit
+        packedV = join [ reverse elm | elm <- head v ]
+
+        packed = packedU # packedV
+
+
+/*packBytes : {k, ct_len} (k = ct_len * 8) => [k]Bit -> ct_byte*/
+packBytes : [(d / n) * m_bar * p_bits + (mu * t_bits)]Bit -> ct_byte
+packBytes bits = split bits
