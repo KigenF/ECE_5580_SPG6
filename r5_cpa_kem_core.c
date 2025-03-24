@@ -1,19 +1,25 @@
+#include "r5_cpa_kem_decap.h"
 #include "r5_cpa_kem_keygen.h"
 #include <stdlib.h>
 #include <stdio.h>
 
 #include <libkeccak.a.headers/SP800-185.h>
+#include <libkeccak.a.headers/KeccakHash.h>
 
 #define len_tau_2 2048
 #define d 594
 #define n 1
 #define k 594 // k = d/n.
-#define kappa_bytes 16
+#define kappa_bits 16
 #define q 8192
 #define n_bar 7
 #define m_bar 7
 #define h 238
-#define nr_bits 10
+#define p_bits 10
+#define t_bits 7
+#define _b_bits 3
+#define cipher_bits 5236
+#define mu 43
 
 #define SHAKE128_RATE 168
 #define SHAKE256_RATE 136
@@ -93,7 +99,7 @@ int drbg_sampler16_2_once(uint16_t *x, const size_t xlen, const void *seed, cons
 }
 
 void create_A_master(uint8_t * in, uint16_t * out) {
-	drbg_sampler16_2_once(out, len_tau_2, in, kappa_bytes, q);
+	drbg_sampler16_2_once(out, len_tau_2, in, kappa_bits, q);
 }
 
 void cshake128_init(cshake_ctx *ctx, const unsigned char *customization, const size_t customization_len) {
@@ -156,7 +162,7 @@ static int permutation_tau_2(uint32_t *row_disp, const unsigned char *seed) {
     uint16_t rnd;
     uint8_t *v = checked_calloc(len_tau_2, 1);
 
-    drbg_init_customization(seed, kappa_bytes, permutation_customization, sizeof (permutation_customization));
+    drbg_init_customization(seed, kappa_bits, permutation_customization, sizeof (permutation_customization));
 
     for (i = 0; i < k; ++i) {
         do {
@@ -238,7 +244,7 @@ void create_S_T(uint8_t * in, uint16_t * out) {
 	int16_t *S_T = out;
 
     /* Initialize drbg */
-    drbg_init(sk, kappa_bytes);
+    drbg_init(sk, kappa_bits);
 
     /* Create rows of sparse vectors */
     for (i = 0; i < n_bar; ++i) {
@@ -246,7 +252,7 @@ void create_S_T(uint8_t * in, uint16_t * out) {
     }
 }
 
-size_t pack(unsigned char *packed, const uint16_t *m, const size_t els) {
+size_t pack(unsigned char *packed, const uint16_t *m, const size_t els, const uint8_t nr_bits) {
     const size_t packed_len = (size_t) (BITS_TO_BYTES(els * nr_bits));
     const uint16_t mask = (uint16_t) ((1 << nr_bits) - 1);
     size_t i;
@@ -296,10 +302,10 @@ void pack_pk(uint8_t * in0, uint16_t * in1, uint8_t * out) {
 	printf("]\n");*/
 
     /* Pack sigma */
-    memcpy(packed_pk + packed_idx, sigma, kappa_bytes);
-    packed_idx += kappa_bytes;
+    memcpy(packed_pk + packed_idx, sigma, kappa_bits);
+    packed_idx += kappa_bits;
     /* Pack B */
-    packed_idx += pack((packed_pk + packed_idx), B, d * n_bar);
+    packed_idx += pack((packed_pk + packed_idx), B, d * n_bar, p_bits);
 	/*printf("packed_pk: \n[");
 	for(int i = 0; i < 5214; i ++)
 	{
@@ -316,10 +322,106 @@ void create_R_T(uint8_t * in, uint16_t * out) {
 	int16_t *R_T = out;
 
     /* Initialize drbg */
-    drbg_init(rho, kappa_bytes);
+    drbg_init(rho, kappa_bits);
 
     /* Create rows of sparse vectors */
     for (i = 0; i < m_bar; ++i) {
         create_secret_vector(&R_T[i * len], len);
     }
+}
+
+size_t unpack(uint16_t *m, const unsigned char *packed, const size_t els, const uint8_t nr_bits) {
+    const size_t unpacked_len = (size_t) (BITS_TO_BYTES(els * nr_bits));
+    size_t i;
+    uint16_t val;
+    size_t bits_done = 0;
+    size_t idx;
+    size_t bit_idx;
+    uint16_t bitmask = (uint16_t) ((1 << nr_bits) - 1);
+
+    if (nr_bits == 8) {
+        for (i = 0; i < els; ++i) {
+            m[i] = packed[i];
+        }
+    } else {
+        for (i = 0; i < els; ++i) {
+            idx = bits_done >> 3;
+            bit_idx = bits_done & 7;
+            val = (uint16_t) (packed[idx] >> bit_idx);
+            if (bit_idx + nr_bits > 8) {
+                /* Get spill over from next packed byte */
+                val = (uint16_t) (val | (packed[idx + 1] << (8 - bit_idx)));
+                if (bit_idx + nr_bits > 16) {
+                    /* Get spill over from next packed byte */
+                    val = (uint16_t) (val | (packed[idx + 2] << (16 - bit_idx)));
+                }
+            }
+            m[i] = val & bitmask;
+            bits_done += nr_bits;
+        }
+    }
+
+    return unpacked_len;
+}
+
+void unpack_ct(uint8_t * in, uint16_t * out_0, uint8_t * out_1){
+    size_t idx = 0;
+	uint16_t *U_T = out_0;
+	size_t U_els = (d/n) * m_bar * n;
+	size_t v_els = 43;
+	unsigned char *packed_ct = in;
+
+    /* Unpack U */
+    idx += unpack(U_T, packed_ct, U_els, 10);
+    /* Unpack v */
+	size_t bits_done = 0;
+    for (size_t i = 0; i < v_els; ++i) {
+        size_t byte_idx = bits_done >> 3;
+        size_t bit_idx = bits_done & 7;
+        uint16_t val = (uint16_t)(packed_ct[idx + byte_idx] >> bit_idx);
+        if (bit_idx + 7 > 8) {
+            val |= (uint16_t)(packed_ct[idx + byte_idx + 1] << (8 - bit_idx));
+        }
+        out_1[i] = (uint8_t)(val & 0x7F); // Mask to 7 bits
+        bits_done += 7;
+    }
+    //idx += unpack(v, (packed_ct + idx), v_els, 7);
+}
+
+static int decompress_element(uint16_t *x, const uint16_t a_bits, const uint16_t b_bits, const uint16_t b_mask) {
+    const uint16_t shift = (uint16_t) (b_bits - a_bits);
+    *x = (uint16_t) (*x << shift);
+    *x &= b_mask;
+    return 0;
+}
+
+void decompress_matrix(uint8_t * in, uint16_t * out) {
+    size_t i;
+	size_t len = mu;
+	size_t els = 1;
+	uint16_t a_bits = t_bits;
+	uint16_t b_bits = p_bits;
+
+    const uint16_t b_mask = (uint16_t) (((uint16_t) 1 << b_bits) - 1);
+    for (i = 0; i < len * els; ++i) {
+		uint16_t value = (uint16_t)in[i]; // Read 8-bit value, 7 bits valid
+        decompress_element(&value, a_bits, b_bits, b_mask);
+		out[i] = value;
+    }
+}
+
+void _pack(uint8_t * in, uint8_t * out) {
+	uint16_t tmp[mu];
+    for (size_t i = 0; i < mu; i++) {
+        tmp[i] = (uint16_t) in[i]; // safely promote each byte to 16-bit
+    }
+	pack(out, tmp, mu, _b_bits);
+}
+
+void hash(uint8_t * in, uint8_t * out)
+{
+	if (cSHAKE128(in, (kappa_bits + cipher_bits) * 8, out, kappa_bits * 8, NULL, 0, NULL, 0) != 0) {
+		printf("Error in cSHAKE128\n");
+		abort();
+	}
 }
