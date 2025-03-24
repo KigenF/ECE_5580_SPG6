@@ -1,0 +1,119 @@
+module r5_cpa_kem_decrypt where
+
+// Parameters for R5N1_1CPA_0d
+type d = 594 //// Number of polynomial coefficients per public matrix row.
+type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
+type q = 8192 // Modulus (2^13). q_bits = 13.
+type n_bar = 7 // Number of columns of the secret matrix to compute B.
+type q_bits = 13
+type p_bits = 10
+type t_bits = 7
+type byte = [8]
+type hex = [16]
+type sigma_byte = [16]byte
+type pk_bits = 5214 // Public key's size = 5214 byes.
+type sk_bits = 16 //Secret key's size = 16 bytes.
+type Tq = (Z q)
+type h = 238
+type cipher_bits = 5236
+type kappa_bits = 16
+type m_bar = 7
+type xe = 0
+type b_bits = 3
+type mu = 43
+type h_3 = 64
+
+r5_cpa_kem_decap : [cipher_bits]byte -> [sk_bits]byte -> [kappa_bits]byte
+r5_cpa_kem_decap ct sk = k_string
+    where
+        msg = r5_cpa_pke_decrypt ct sk
+        k_string = hash (msg#ct)
+
+r5_cpa_pke_decrypt : [cipher_bits]byte -> [sk_bits]byte -> [kappa_bits]byte
+r5_cpa_pke_decrypt ct sk = msg
+    where
+        S_T = create_S_T sk
+        (U_T, v) = unpack_ct ct
+        U = transpose_matrix U_T
+        v_p_bits = decompress_matrix v
+        X_prime = dotMatMat S_T U
+        m2 = diff_msg v_p_bits X_prime
+        m2_b_bits = round_matrix m2
+        m1 = _pack m2_b_bits
+        msg = m1
+
+/*Testing functions*/
+show_sigma sigma = sigma
+
+test_U : [cipher_bits]byte -> [d/n * m_bar][p_bits]
+test_U ct = U
+    where
+        (U_T, v) = unpack_ct ct
+        U = transpose_matrix U_T
+
+test_decomp : [cipher_bits]byte -> [mu][p_bits]
+test_decomp ct = v_p_bits
+    where
+        (U_T, v) = unpack_ct ct
+        v_p_bits = decompress_matrix v
+
+test_mat_mult : [cipher_bits]byte -> [kappa_bits]byte -> [n_bar][m_bar][p_bits]
+test_mat_mult ct sk = dotMatMat s_t U
+    where
+        s_t = create_S_T sk
+        (U_T, v) = unpack_ct ct
+        U = transpose_matrix U_T
+
+test_diff_msg : [cipher_bits]byte -> [kappa_bits]byte -> [mu][p_bits]
+test_diff_msg ct sk = diff_msg v_p_bits X_prime
+    where
+        X_prime = test_mat_mult ct sk
+        v_p_bits = test_decomp ct
+
+test_round_mat : [cipher_bits]byte -> [kappa_bits]byte -> [mu][b_bits]
+test_round_mat ct sk = round_matrix m2
+    where
+        m2 = test_diff_msg ct sk
+
+/*test_pack : [cipher_bits]byte -> [kappa_bits]byte -> [mu * b_bits / 8]byte
+test_pack ct sk = pack m2_b_bits
+    where
+        m2_b_bits = test_round_mat ct sk*/
+
+foreign create_S_T : [sk_bits]byte -> [n_bar][d][p_bits]
+foreign unpack_ct : [cipher_bits]byte -> ([(d/n) * m_bar * n][p_bits], [mu][t_bits])
+foreign decompress_matrix : [mu][t_bits] -> [mu][p_bits]
+foreign _pack : [mu][b_bits] -> [kappa_bits]byte
+foreign hash : [kappa_bits + cipher_bits]byte -> [kappa_bits]byte
+
+transpose_matrix : [m_bar * d/n][p_bits] -> [d/n * m_bar][p_bits]
+transpose_matrix A = join (transpose (groupBy`{d/n} A))
+
+round_matrix : [mu][p_bits] -> [mu][b_bits]
+round_matrix A = [round_element elm | elm <- A]
+
+round_element x = drop`{7}((x + 64) >> 7)
+
+dotVecVec : [d][p_bits] -> [d][p_bits] -> [p_bits]
+dotVecVec v1 v2 = (sum (zipWith (*) v1 v2) && 1023)
+
+dotMatVec : [n_bar][d][p_bits] -> [d][p_bits] -> [n_bar][p_bits]
+dotMatVec matrix vector = [dotVecVec v1 vector | v1 <- matrix]
+
+dotMatMat : [n_bar][d][p_bits] -> [d * m_bar][p_bits] -> [n_bar][m_bar][p_bits]
+dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
+    where m' = transpose (groupBy`{m_bar} matrix2)
+
+diff_msg : [mu][p_bits] -> [n_bar][m_bar][p_bits] -> [mu][p_bits]
+diff_msg v X_prime = [v @ j | j <- [0 .. mu - 1]] - [(join X_prime) @ i | i <- [0 .. mu - 1]]
+
+/*pack : [mu][b_bits] -> [mu * b_bits / 8]byte
+pack m2_b_bits = m1
+    where
+        flat_m2 = join m2_b_bits
+        //m1 = join m2_b_bits
+        //padded_m2 = flat_m2 # 0000000
+        m1 = groupBy`{8} (take`{16 * 8} flat_m2)*/
+
+/*pack_pk : sigma_byte -> [d][n_bar][p_bits] -> pk_byte
+pack_pk sigma B = (sigma # split (join (join (map (map reverse) B))))*/
