@@ -1,0 +1,22 @@
+let roundElement_spec : LLVMSetup () = do {
+    ptr <- llvm_alloc (llvm_int 16);
+    x <- llvm_fresh_var "x" (llvm_int 13);
+    llvm_points_to ptr (llvm_term {{ (0:[3]) # x : [16] }});
+
+    llvm_execute_func [
+      ptr,
+      llvm_term {{ 13 : [16] }},
+      llvm_term {{ 10 : [16] }},
+      llvm_term {{ 0x03FF : [16] }},
+      llvm_term {{ 4  : [16] }}
+    ];
+
+    llvm_points_to ptr (llvm_term
+      {{ (0:[6]) #  (drop`{3}((x + 4) >> 3)) : [16] }}
+    );
+
+    return ();
+};
+
+m <- llvm_load_module "round_matrix.bc";
+llvm_verify m "round_element" [] false roundElement_spec abc;

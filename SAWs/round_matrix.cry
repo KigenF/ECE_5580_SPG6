@@ -1,0 +1,18 @@
+module Round_matrix where
+
+type d = 594 // Number of polynomial coefficients per public matrix row.
+type n_bar = 7 // Number of columns of the secret matrix to compute B.
+type q_bits = [13]
+type p_bits = [10]
+
+round_matrix :
+    [d][n_bar]q_bits -> [d][n_bar]p_bits
+round_matrix A = [[round_element (elm) | elm <- row] | row <- A]
+
+round_element x = drop`{3}((x + 4) >> 3)
+
+flatten : [d][n_bar]p_bits -> [d*n_bar][16]
+flatten xss = [ (0:[6]) # x | x <- join xss]
+
+unflatten : [d*n_bar][16] -> [d][n_bar]q_bits
+unflatten arr = [[ drop`{3}y | y <- row] | row <- split arr]
