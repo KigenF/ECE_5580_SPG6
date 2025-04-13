@@ -1,7 +1,7 @@
 module r5_cpa_kem_decrypt where
 
 // Parameters for R5N1_1CPA_0d
-type d = 594 //// Number of polynomial coefficients per public matrix row.
+type d = 594 // Number of polynomial coefficients per public matrix row.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type q = 8192 // Modulus (2^13). q_bits = 13.
 type n_bar = 7 // Number of columns of the secret matrix to compute B.
@@ -39,8 +39,8 @@ r5_cpa_pke_decrypt ct sk = msg
         X_prime = dotMatMat S_T U
         m2 = diff_msg v_p_bits X_prime
         m2_b_bits = round_matrix m2
-        m1 = _pack m2_b_bits
-        msg = m1
+        m1 = pack_m1 m2_b_bits
+        msg = take`{16} m1
 
 /*Testing functions*/
 show_sigma sigma = sigma
@@ -51,11 +51,21 @@ test_U ct = U
         (U_T, v) = unpack_ct ct
         U = transpose_matrix U_T
 
+test_U_T : [cipher_bits]byte -> [(d/n) * m_bar * n][p_bits]
+test_U_T ct = U_T
+    where
+        (U_T, v) = unpack_ct ct
+
 test_decomp : [cipher_bits]byte -> [mu][p_bits]
 test_decomp ct = v_p_bits
     where
         (U_T, v) = unpack_ct ct
         v_p_bits = decompress_matrix v
+
+test_v : [cipher_bits]byte -> [mu][t_bits]
+test_v ct = v
+    where
+        (U_T, v) = unpack_ct ct
 
 test_mat_mult : [cipher_bits]byte -> [kappa_bits]byte -> [n_bar][m_bar][p_bits]
 test_mat_mult ct sk = dotMatMat s_t U
@@ -75,15 +85,8 @@ test_round_mat ct sk = round_matrix m2
     where
         m2 = test_diff_msg ct sk
 
-/*test_pack : [cipher_bits]byte -> [kappa_bits]byte -> [mu * b_bits / 8]byte
-test_pack ct sk = pack m2_b_bits
-    where
-        m2_b_bits = test_round_mat ct sk*/
-
 foreign create_S_T : [sk_bits]byte -> [n_bar][d][p_bits]
-foreign unpack_ct : [cipher_bits]byte -> ([(d/n) * m_bar * n][p_bits], [mu][t_bits])
-foreign decompress_matrix : [mu][t_bits] -> [mu][p_bits]
-foreign _pack : [mu][b_bits] -> [kappa_bits]byte
+//foreign unpack_ct : [cipher_bits]byte -> ([(d/n) * m_bar * n][p_bits], [mu][t_bits])
 foreign hash : [kappa_bits + cipher_bits]byte -> [kappa_bits]byte
 
 transpose_matrix : [m_bar * d/n][p_bits] -> [d/n * m_bar][p_bits]
@@ -107,13 +110,87 @@ dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
 diff_msg : [mu][p_bits] -> [n_bar][m_bar][p_bits] -> [mu][p_bits]
 diff_msg v X_prime = [v @ j | j <- [0 .. mu - 1]] - [(join X_prime) @ i | i <- [0 .. mu - 1]]
 
-/*pack : [mu][b_bits] -> [mu * b_bits / 8]byte
-pack m2_b_bits = m1
+// ceil(43 * 3 / 8) = 17
+pack_m1 : [mu][b_bits] -> [17]byte
+pack_m1 m2_b_bits = m1
     where
-        flat_m2 = join m2_b_bits
-        //m1 = join m2_b_bits
-        //padded_m2 = flat_m2 # 0000000
-        m1 = groupBy`{8} (take`{16 * 8} flat_m2)*/
+        grouped_m2 = groupBy`{8} (take`{40} m2_b_bits)
+        rear_m2 = drop`{40} m2_b_bits
+        m1 = (join [pack_mu m | m <- grouped_m2]) # pack_rear rear_m2
 
-/*pack_pk : sigma_byte -> [d][n_bar][p_bits] -> pk_byte
-pack_pk sigma B = (sigma # split (join (join (map (map reverse) B))))*/
+pack_mu : [8][b_bits] -> [3]byte
+pack_mu m = result
+    where
+        first_B = (drop`{1} (m @ 2)) # (m @ 1) # (m @ 0)
+        second_B = (drop`{2} (m @ 5)) # (m @ 4) # (m @ 3) # (take`{1} (m @ 2))
+        third_B = (m @ 7) # (m @ 6) # (take`{2} (m @ 5))
+        result = [first_B, second_B, third_B]
+
+pack_rear : [3][b_bits] -> [2]byte
+pack_rear rear = result
+    where
+        first_B = (drop`{1} (rear @ 2)) # (rear @ 1) # (rear @ 0)
+        second_B = 0b0000000 # (take`{1} (rear @ 2))
+        result = [first_B, second_B]
+
+decompress_matrix : [mu][t_bits] -> [mu][p_bits]
+decompress_matrix v = v_p_bits
+    where
+        v_p_bits = [v_ # 0b000 | v_ <- v]
+
+unpack_ct : [cipher_bits]byte -> ([(d/n) * m_bar * n][p_bits], [mu][t_bits])
+unpack_ct ct = (U_T, v)
+    where
+        U_T = unpack_U_T ct
+        v = unpack_v ct
+
+unpack_U_T : [cipher_bits]byte -> [(d/n) * m_bar * n][p_bits]
+unpack_U_T ct = U_T
+    where
+        grouped_front = groupBy`{5} (take`{5195} ct)
+        rear = take`{3} (drop`{5195} ct)
+        U_T = (join [unpack_front_U_T f | f <- grouped_front]) # unpack_rear_U_T rear
+
+unpack_front_U_T : [5]byte -> [4][p_bits]
+unpack_front_U_T f = result
+    where
+        first_P = (drop`{6} (f @ 1)) # (f @ 0)
+        second_P = (drop`{4} (f @ 2)) # (take`{6} (f @ 1))
+        third_P = (drop`{2} (f @ 3)) # (take`{4} (f @ 2))
+        fourth_P = (f @ 4) # (take`{2} (f @ 3))
+        result = [first_P, second_P, third_P, fourth_P]
+
+unpack_rear_U_T : [3]byte -> [2][p_bits]
+unpack_rear_U_T r = result
+    where
+        first_P = (drop`{6} (r @ 1)) # (r @ 0)
+        second_P = (drop`{4} (r @ 2)) # (take`{6} (r @ 1))
+        result = [first_P, second_P]
+
+unpack_v : [cipher_bits]byte -> [mu][t_bits]
+unpack_v ct = v
+    where
+        grouped_front = groupBy`{7} (take`{35} (drop`{5198} ct))
+        rear = drop`{5233} ct
+        v = (join [unpack_front_v f | f <- grouped_front]) # unpack_rear_v rear
+
+unpack_rear_v : [3]byte -> [3][t_bits]
+unpack_rear_v r = result
+    where
+        first_T = drop`{1} (r @ 0)
+        second_T = (drop`{2} (r @ 1)) # (take`{1} (r @ 0))
+        third_T = (drop`{3} (r @ 2)) # (take`{2} (r @ 1))
+        result = [first_T, second_T, third_T]
+
+unpack_front_v : [7]byte -> [8][t_bits]
+unpack_front_v f = result
+    where
+        first_T = drop`{1} (f @ 0)
+        second_T = (drop`{2} (f @ 1)) # (take`{1} (f @ 0))
+        third_T = (drop`{3} (f @ 2)) # (take`{2} (f @ 1))
+        fourth_T = (drop`{4} (f @ 3)) # (take`{3} (f @ 2))
+        fifth_T = (drop`{5} (f @ 4)) # (take`{4} (f @ 3))
+        sixth_T = (drop`{6} (f @ 5)) # (take`{5} (f @ 4))
+        seventh_T = (drop`{7} (f @ 6)) # (take`{6} (f @ 5))
+        eighth_T = take`{7} (f @ 6)
+        result = [first_T, second_T, third_T, fourth_T, fifth_T, sixth_T, seventh_T, eighth_T]
