@@ -1,4 +1,5 @@
 import "round_matrix.cry";
+include "helpers.saw";
 
 let roundElement_spec : LLVMSetup () = do {
     ptr <- llvm_alloc (llvm_int 16);
@@ -20,7 +21,7 @@ let roundElement_spec : LLVMSetup () = do {
     return ();
 };
 
-let roundMatrix_spec : LLVMSetup () = do {
+/* let roundMatrix_spec : LLVMSetup () = do {
     arr <- llvm_alloc (llvm_array 4158 (llvm_int 16));
     input <- llvm_fresh_var "input" (llvm_array 4158 (llvm_int 16));
     llvm_points_to arr (llvm_term {{ input : [4158][16] }});
@@ -37,6 +38,29 @@ let roundMatrix_spec : LLVMSetup () = do {
     llvm_points_to arr (llvm_term
       {{ flatten (round_matrix (unflatten input)) : [4158][16] }}
     );
+
+    return ();
+}; */
+
+
+
+//SAWscript following the given code format
+
+let roundMatrix_spec = do {
+
+    (input, arr) <- ptr_to_fresh "input" (llvm_array 4158 (llvm_int 16));
+
+    llvm_execute_func [
+      arr,
+      llvm_term {{ 594 : [64] }},
+      llvm_term {{ 7 : [64] }},
+      llvm_term {{ 13 : [16] }},
+      llvm_term {{ 10 : [16] }},
+      llvm_term {{ 4  : [16] }}
+    ];
+
+    let result_spec = {{ flatten (round_matrix (unflatten input)) : [4158][16] }};
+    llvm_points_to arr (llvm_term {{result_spec}});
 
     return ();
 };

@@ -16,6 +16,7 @@ type byte = [8]
 type hex = [16]
 type sigma_byte = [16]byte
 type pk_byte = [5214]byte // Public key's size = 5214 byes.
+type pk_bits = [5214 * 8]
 type sk_byte = [16]byte //Secret key's size = 16 bytes.
 type Tq = (Z q)
 type h = 238
@@ -31,7 +32,7 @@ r5_cpa_pke_keygen : sigma_byte -> sk_byte -> (pk_byte, sk_byte)
 r5_cpa_pke_keygen sigma _sk = (pk, sk)
     where
         A = create_A sigma
-        S_T = create_S_T sk
+        S_T = create_S_T _sk
         S = transpose_matrix S_T
         B = dotMatMat A S
         B_b = round_matrix B
@@ -44,7 +45,6 @@ r5_cpa_pke_keygen sigma _sk = (pk, sk)
 
 foreign create_A : sigma_byte -> [d/n][d/n]q_bits
 foreign create_S_T : sk_byte -> [n_bar][d]q_bits
-foreign pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
 
 transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]q_bits -> [col][row]q_bits
 transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
@@ -66,5 +66,41 @@ dotMatMat : /*{k1,k2,k3} (fin k1, fin k2, fin k3) =>*/
 dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
     where m' = transpose matrix2
 
-/*pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
-pack_pk sigma B = (sigma # split (join (join (map (map reverse) B))))*/
+// Logic of packing the public key:
+// Compose a 5214-byte result from a 584 * 7 * 10 bit array.
+// The way four 10-bits sequences is like: 
+// Input: 0b0010110010 0b0001101001 0b0101100100 0b1010111101
+// byte 1: 0b10110010 (the first 8 bits)
+// byte 2: 0b10100100 (the last 2 bits of the first input and the first 6 bits of the second)
+// byte 3: 0b01000001 (the last 4 bits of the second input and the first 4 bits of the third)
+// byte 4: 0b01010110 (the last 6 bits of the third and the first 2 bits of the fourth)
+// byte 5: 0b10101111 (the last 8 bits of the fourth)
+// If there is an input has a length lesser than 8 bits, e.g., 0b0011, the result will be: 
+// 0b00000011, padding zeros to its most significant bits.
+pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
+pack_pk sigma B_b = pk
+    where
+        joined_B_b = join B_b
+        front_B_b = take`{1039 * 4} joined_B_b
+        rear_B_b = drop`{1039 * 4} joined_B_b
+        padded_rear = pad_rear rear_B_b
+        grouped_B_b = groupBy`{4} front_B_b
+        pk = sigma # join [myPack g | g <- grouped_B_b] # padded_rear
+
+myPack : [4]p_bits -> [5]byte
+myPack B = result
+    where
+        first_B = take`{8} (B @ 0 << 2)
+        second_B = drop`{4} (B @ 1) # take`{2} (B @ 0)
+        third_B = drop`{6} (B @ 2) # take`{4} (B @ 1)
+        fourth_B = drop`{8} (B @ 3) # take`{6} (B @ 2)
+        fifth_B = take`{8} (B @ 3)
+        result = [first_B, second_B, third_B, fourth_B, fifth_B]
+
+pad_rear : [2]p_bits -> [3]byte
+pad_rear rear_B_b = padded_rear
+    where
+        first_B = take`{8} (rear_B_b @ 0 << 2)
+        second_B = drop`{4} (rear_B_b @ 1) # take`{2} (rear_B_b @ 0)
+        third_B = [0,0,0,0] # take`{4} (rear_B_b @ 1)
+        padded_rear = [first_B, second_B, third_B]
