@@ -1,0 +1,61 @@
+import "mult_matrix.cry";
+include "helpers.saw";
+
+/* let multMatrix_spec : LLVMSetup () = do {
+    matout <- llvm_alloc (llvm_array 70 (llvm_int 16));
+    //init <- llvm_fresh_var "init" (llvm_array 70 (llvm_int 16));
+    //llvm_points_to matout (llvm_term {{ init : [70][16] }});
+
+    mat1 <- llvm_alloc (llvm_array 100 (llvm_int 16));
+    input1 <- llvm_fresh_var "input1" (llvm_array 100 (llvm_int 16));
+    llvm_points_to mat1 (llvm_term {{ input1 : [100][16] }});
+
+    mat2 <- llvm_alloc (llvm_array 70 (llvm_int 16));
+    input2 <- llvm_fresh_var "input2" (llvm_array 70 (llvm_int 16));
+    llvm_points_to mat2 (llvm_term {{ input2 : [70][16] }});
+
+    llvm_execute_func [
+      matout,
+      mat1,
+      llvm_term {{ 10 : [16] }},
+      llvm_term {{ 10 : [16] }},
+      mat2,
+      llvm_term {{ 10 : [16] }},
+      llvm_term {{ 7  : [16] }}
+    ];
+
+    llvm_points_to matout (llvm_term
+      {{ flatten (dotMatMat (unflatten1 input1) (unflatten2 input2)) : [70][16] }}
+    );
+
+    return ();
+};*/
+
+
+
+//SAWscript following the given code format
+
+let multMatrix_spec = do {
+
+    (init, matout) <- ptr_to_fresh "init" (llvm_array 28 (llvm_int 16));
+    (input1, mat1) <- ptr_to_fresh "input1" (llvm_array 16 (llvm_int 16));
+    (input2, mat2) <- ptr_to_fresh "input2" (llvm_array 28 (llvm_int 16));
+
+    llvm_execute_func [
+      matout,
+      mat1,
+      llvm_term {{ 4 : [16] }},
+      llvm_term {{ 4 : [16] }},
+      mat2,
+      llvm_term {{ 4 : [16] }},
+      llvm_term {{ 7  : [16] }}
+    ];
+
+    let result_spec = {{ flatten (dotMatMat (unflatten1 input1) (unflatten2 input2)) : [28][16] }};
+    llvm_points_to matout (llvm_term {{result_spec}});
+
+    return ();
+};
+
+m <- llvm_load_module "mult_matrix.bc";
+llvm_verify m "mult_matrix" [] false multMatrix_spec abc;

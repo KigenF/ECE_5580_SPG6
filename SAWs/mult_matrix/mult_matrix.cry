@@ -1,0 +1,48 @@
+module Mult_matrix where
+
+type d = 4 //// Number of polynomial coefficients per public matrix row.
+type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
+type n_bar = 7  // Degree of reduction polynomial. n = 1 means non-ring
+type q_bits = [13]
+
+
+//dotVecVec : [d/n]q_bits -> [d/n]q_bits -> q_bits
+//dotVecVec v1 v2 = (sum (zipWith (*) v1 v2) && (8191))
+
+//dotMatVec : [d/n][d/n]q_bits -> [d]q_bits -> [d/n]q_bits
+//dotMatVec matrix vector = [dotVecVec v1 vector | v1 <- matrix]
+
+//dotMatMat : /*{k1,k2,k3} (fin k1, fin k2, fin k3) =>*/
+//    [d/n][d/n]q_bits -> [d][n_bar]q_bits -> [d][n_bar]q_bits
+//dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
+//    where m' = transpose matrix2
+
+//flatten : [d][n_bar]q_bits -> [d*n_bar][16]
+//flatten xss = [ (0:[3]) # x | x <- join xss]
+
+//unflatten1 : [d*d][16] -> [d][d]q_bits
+//unflatten1 arr = [[ drop`{3}y | y <- row] | row <- split arr]
+
+//unflatten2 : [d*n_bar][16] -> [d][n_bar]q_bits
+//unflatten2 arr = [[ drop`{3}y | y <- row] | row <- split arr]
+
+
+dotVecVec : [d/n][16] -> [d/n][16] -> [16]
+dotVecVec v1 v2 = (sum (zipWith (*) v1 v2))
+
+dotMatVec : [d/n][d/n][16] -> [d][16] -> [d/n][16]
+dotMatVec matrix vector = [dotVecVec v1 vector | v1 <- matrix]
+
+dotMatMat : /*{k1,k2,k3} (fin k1, fin k2, fin k3) =>*/
+    [d/n][d/n][16] -> [d][n_bar][16] -> [d][n_bar][16]
+dotMatMat matrix1 matrix2 = transpose [dotMatVec matrix1 vector | vector <- m']
+    where m' = transpose matrix2
+
+flatten : [d][n_bar][16] -> [d*n_bar][16]
+flatten xss = [ x | x <- join xss]
+
+unflatten1 : [d*d][16] -> [d][d][16]
+unflatten1 arr = [[ y | y <- row] | row <- split arr]
+
+unflatten2 : [d*n_bar][16] -> [d][n_bar][16]
+unflatten2 arr = [[ y | y <- row] | row <- split arr]
