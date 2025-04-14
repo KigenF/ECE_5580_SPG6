@@ -4,7 +4,8 @@
 
 int mult_matrix(uint16_t *matrix_out, uint16_t *matrix1, const uint16_t m1_rows, const uint16_t m1_cols, uint16_t *matrix2, const uint16_t m2_rows, const uint16_t m2_cols)
 {
-    uint16_t m1_ct, m1_rt, m2_ct, row_sum;
+    uint16_t m1_ct, m1_rt, m2_ct;
+    uint32_t row_sum;
 
     for(m1_rt = 0; m1_rt < m1_rows; m1_rt++)
     {
@@ -12,9 +13,9 @@ int mult_matrix(uint16_t *matrix_out, uint16_t *matrix1, const uint16_t m1_rows,
         {
             row_sum = 0;
             for(m1_ct = 0; m1_ct < m1_cols; m1_ct++){
-                row_sum += matrix1[(m1_rt * m1_cols) + m1_ct] * matrix2[(m1_ct * m2_cols) + m2_ct];
+                row_sum += (uint32_t)matrix1[(m1_rt * m1_cols) + m1_ct] * (uint32_t)matrix2[(m1_ct * m2_cols) + m2_ct];
             }
-            matrix_out[(m1_rt * m2_cols) + m2_ct] = row_sum;
+            matrix_out[(m1_rt * m2_cols) + m2_ct] = (uint16_t)row_sum;
         }
     }
     return 0;

@@ -1,4 +1,4 @@
 .SUFFIXES: .c .bc
 
 %.bc : %.c
-	clang -g -O1 -c -emit-llvm $< -o $@
+	clang -g0 -O0 -c -emit-llvm $< -o $@

@@ -1,6 +1,6 @@
 module Mult_matrix where
 
-type d = 4 //// Number of polynomial coefficients per public matrix row.
+type d = 10 //// Number of polynomial coefficients per public matrix row.
 type n = 1  // Degree of reduction polynomial. n = 1 means non-ring
 type n_bar = 7  // Degree of reduction polynomial. n = 1 means non-ring
 type q_bits = [13]

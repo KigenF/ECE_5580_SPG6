@@ -33,17 +33,17 @@ include "helpers.saw";
 
 let transposeMatrix_spec = do {
 
-    (init, result) <- ptr_to_fresh "init" (llvm_array 100 (llvm_int 16));
-    (input, arr) <- ptr_to_fresh "input" (llvm_array 100 (llvm_int 16));
+    (init, result) <- ptr_to_fresh "init" (llvm_array 4158 (llvm_int 16));
+    (input, arr) <- ptr_to_fresh "input" (llvm_array 4158 (llvm_int 16));
 
     llvm_execute_func [
       result,
       arr,
-      llvm_term {{ 10 : [64] }},
-      llvm_term {{ 10 : [64] }}
+      llvm_term {{ 594 : [64] }},
+      llvm_term {{ 7 : [64] }}
     ];
 
-    let result_spec = {{ flatten1 (transpose_matrix1 (unflatten1 input)) : [100][16] }};
+    let result_spec = {{ flatten (transpose_matrix (unflatten input)) : [4158][16] }};
     llvm_points_to result (llvm_term {{result_spec}});
 
     return ();

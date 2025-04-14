@@ -37,21 +37,21 @@ include "helpers.saw";
 
 let multMatrix_spec = do {
 
-    (init, matout) <- ptr_to_fresh "init" (llvm_array 28 (llvm_int 16));
-    (input1, mat1) <- ptr_to_fresh "input1" (llvm_array 16 (llvm_int 16));
-    (input2, mat2) <- ptr_to_fresh "input2" (llvm_array 28 (llvm_int 16));
+    (init, matout) <- ptr_to_fresh "init" (llvm_array 70 (llvm_int 16));
+    (input1, mat1) <- ptr_to_fresh "input1" (llvm_array 100 (llvm_int 16));
+    (input2, mat2) <- ptr_to_fresh "input2" (llvm_array 70 (llvm_int 16));
 
     llvm_execute_func [
       matout,
       mat1,
-      llvm_term {{ 4 : [16] }},
-      llvm_term {{ 4 : [16] }},
+      llvm_term {{ 10 : [16] }},
+      llvm_term {{ 10 : [16] }},
       mat2,
-      llvm_term {{ 4 : [16] }},
+      llvm_term {{ 10 : [16] }},
       llvm_term {{ 7  : [16] }}
     ];
 
-    let result_spec = {{ flatten (dotMatMat (unflatten1 input1) (unflatten2 input2)) : [28][16] }};
+    let result_spec = {{ flatten (dotMatMat (unflatten1 input1) (unflatten2 input2)) : [70][16] }};
     llvm_points_to matout (llvm_term {{result_spec}});
 
     return ();

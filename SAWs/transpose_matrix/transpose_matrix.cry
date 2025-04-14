@@ -1,27 +1,27 @@
 module Transpose_matrix where
 
-type r = 10
-type c = 10
+type r = 594
+type c = 7
 type q_bits = [13]
 
 //transpose_matrix : {row, col} (fin row, fin col, row >= 1, col >= 1) => [row][col]q_bits -> [col][row]q_bits
 //transpose_matrix A = [[A @ j @ i | j <- [0 .. row - 1]] | i <- [0 .. col - 1]]
 
-transpose_matrix : [r][c]q_bits -> [c][r]q_bits
-transpose_matrix A = [[A @ j @ i | j <- [0 .. 9]] | i <- [0 .. 9]]
+//transpose_matrix : [r][c]q_bits -> [c][r]q_bits
+//transpose_matrix A = [[A @ j @ i | j <- [0 .. 9]] | i <- [0 .. 9]]
 
-flatten : [r][c]q_bits -> [r*c][16]
-flatten xss = [ (0:[3]) # x | x <- join xss]
+//flatten : [r][c]q_bits -> [r*c][16]
+//flatten xss = [ (0:[3]) # x | x <- join xss]
 
-unflatten : [r*c][16] -> [r][c]q_bits
-unflatten arr = [[ drop`{3}y | y <- row] | row <- split arr]
+//unflatten : [r*c][16] -> [r][c]q_bits
+//unflatten arr = [[ drop`{3}y | y <- row] | row <- split arr]
 
 
-transpose_matrix1 : [r][c][16] -> [c][r][16]
-transpose_matrix1 A = [[A @ j @ i | j <- [0 .. 9]] | i <- [0 .. 9]]
+transpose_matrix : [r][c][16] -> [c][r][16]
+transpose_matrix A = [[A @ j @ i | j <- [0 .. r-1]] | i <- [0 .. c-1]]
 
-flatten1 : [r][c][16] -> [r*c][16]
-flatten1 xss = [ x | x <- join xss]
+flatten : [c][r][16] -> [r*c][16]
+flatten xss = [ x | x <- join xss]
 
-unflatten1 : [r*c][16] -> [r][c][16]
-unflatten1 arr = [[ y | y <- row] | row <- split arr]
+unflatten : [r*c][16] -> [r][c][16]
+unflatten arr = [[ y | y <- row] | row <- split arr]

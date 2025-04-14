@@ -1,0 +1,36 @@
+module Pack_pk where
+
+type d = 594 // Number of polynomial coefficients per public matrix row.
+type n_bar = 7 // Number of columns of the secret matrix to compute B.
+type q_bits = [13]
+type p_bits = [10]
+type sigma_byte = [16]byte
+type pk_byte = [5214]byte // Public key's size = 5214 byes.
+
+pack_pk : sigma_byte -> [d][n_bar]p_bits -> pk_byte
+pack_pk sigma B_b = pk
+    where
+        joined_B_b = join B_b
+        front_B_b = take`{1039 * 4} joined_B_b
+        rear_B_b = drop`{1039 * 4} joined_B_b
+        padded_rear = pad_rear rear_B_b
+        grouped_B_b = groupBy`{4} front_B_b
+        pk = sigma # join [myPack g | g <- grouped_B_b] # padded_rear
+
+myPack : [4]p_bits -> [5]byte
+myPack B = result
+    where
+        first_B = take`{8} (B @ 0 << 2)
+        second_B = drop`{4} (B @ 1) # take`{2} (B @ 0)
+        third_B = drop`{6} (B @ 2) # take`{4} (B @ 1)
+        fourth_B = drop`{8} (B @ 3) # take`{6} (B @ 2)
+        fifth_B = take`{8} (B @ 3)
+        result = [first_B, second_B, third_B, fourth_B, fifth_B]
+
+pad_rear : [2]p_bits -> [3]byte
+pad_rear rear_B_b = padded_rear
+    where
+        first_B = take`{8} (rear_B_b @ 0 << 2)
+        second_B = drop`{4} (rear_B_b @ 1) # take`{2} (rear_B_b @ 0)
+        third_B = [0,0,0,0] # take`{4} (rear_B_b @ 1)
+        padded_rear = [first_B, second_B, third_B]
