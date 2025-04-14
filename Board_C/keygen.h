@@ -6,4 +6,6 @@ int round_element(uint16_t *x, const uint16_t a_bits, const uint16_t b_bits, con
 
 int round_matrix(uint16_t *matrix, const size_t len, const size_t els, const uint16_t a, const uint16_t b, const uint16_t rounding_constant);
 
-int dotMatMat(uint16_t *matrix_out, uint16_t *matrix1, const uint16_t m1_rows, const uint16_t m1_cols, uint16_t *matrix2, const uint16_t m2_rows, const uint16_t m2_cols);
+int kemKeygen(uint8_t sigma[16], uint8_t sk[16], uint8_t pk[5214]);
+
+int add(int a, int b);
