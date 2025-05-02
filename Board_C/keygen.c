@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 // #include "keccak_generic32/libXKCP.a.headers/KeccakHash.h"
 // #include "keccak_generic32/libXKCP.a.headers/SP800-185.h"
 #include "generalFunctions.h"
@@ -58,43 +59,6 @@ typedef struct {
 static drbg_ctx ctx;
 static const uint8_t permutation_customization[2] = {0, 1};
 
-static int round_element(uint16_t *x, const uint16_t a_bits, const uint16_t b_bits, const uint16_t b_mask, const uint16_t rounding_constant) {
-    const uint16_t shift = (uint16_t) (a_bits - b_bits);
-    *x = (uint16_t) (*x + rounding_constant);
-    *x = (uint16_t) (*x >> shift);
-    *x &= b_mask;
-    return 0;
-}
-
-int round_matrix(uint16_t *matrix, const size_t len, const size_t els, const uint16_t a, const uint16_t b, const uint16_t rounding_constant) {
-    size_t i;
-
-    uint16_t b_mask = (uint16_t) (((uint16_t) 1 << b) - 1);
-    for (i = 0; i < len * els; ++i) {
-        round_element(matrix + i, a, b, b_mask, rounding_constant);
-    }
-
-    return 0;
-}
-
-
-
-static void generate_cshake128(uint8_t *output, const size_t output_len) {
-    size_t i, j;
-
-    i = ctx.index;
-    for (j = 0; j < output_len; j++) {
-        if (i >= SHAKE128_RATE) {
-            // if(cSHAKE128_Squeeze(&ctx.generator_ctx, ctx.output, SHAKE128_RATE * 8) !=0){
-            //     abort();
-            // }
-            cshakeSqueeze(&ctx.generator_ctx, ctx.output, SHAKE128_RATE * 8);
-            i = 0;
-        }
-        output[j] = ctx.output[i++];
-    }
-    ctx.index = i;
-}
 
 static int permutation_tau_2(uint32_t *row_disp, const unsigned char *seed){
     uint32_t i;
@@ -178,62 +142,7 @@ void create_A(uint8_t *sigma, uint16_t *A) {
 	free(A_permutation);
 }
 
-static int create_secret_vector(uint16_t *vector, const uint16_t len) {
-    size_t j;
-    uint16_t idx;
-    const uint32_t range_divisor = (uint32_t) (0x10000 / len); \
-    const uint32_t range_limit = len * range_divisor;
-    uint16_t rnd;
-    uint8_t srnd; 
 
-    memset(vector, 0, sizeof(vector) * len);
-
-    for (j = 0; j < h; ++j) {
-        do {
-            // idx = drbg_sampler16(len);
-            do {
-                // drbg(&rnd, sizeof (rnd));
-                ctx.generate(&srnd, sizeof(rnd));
-                rnd = (uint16_t)(srnd);
-                rnd = (uint16_t) LITTLE_ENDIAN16(rnd);
-            } while (rnd >= range_limit);
-            rnd = (uint16_t) (rnd / range_divisor);
-            idx = rnd;
-        } while (vector[idx] != 0);
-        vector[idx] = (j & 1) ? -1 : 1;
-    }
-
-    return 0;
-}
-
-void create_S_T(uint8_t *in, uint16_t *out){
-    size_t i;
-    const uint16_t len = (uint16_t) (k * n);
-	uint8_t *sk = in;
-	uint16_t *S_T = out;
-
-    /* Initialize drbg */
-    // drbg_init(sk, kappa_bits);
-    // if(cSHAKE128_Initialize(&ctx.generator_ctx, 0, NULL, 0, NULL, 0) != 0){
-    if(cshakeInit(&ctx.generator_ctx, 0, NULL, 0, NULL, 0)){
-        abort();
-    }
-    // if (cSHAKE128_Update(&ctx.generator_ctx, sk, kappa_bits * 8) != 0) {
-	// 	abort();
-	// }
-    cshakeAbsorb(&ctx.generator_ctx, sk, kappa_bits * 8);
-	// if (cSHAKE128_Final(&ctx.generator_ctx, NULL) != 0) {
-	// 	abort();
-	// }
-    cshakeFinal(&ctx.generator_ctx);
-    ctx.index = SHAKE128_RATE;
-    ctx.generate = &generate_cshake128;
-
-    /* Create rows of sparse vectors */
-    for (i = 0; i < n_bar; ++i) {
-        create_secret_vector(&S_T[i * len], len);
-    }
-}
 
 size_t pack(uint8_t *packed, const uint16_t *m, const size_t els, const uint8_t nr_bits){
     size_t packed_len = (size_t)(((els * nr_bits)+7)/ 8);
@@ -292,7 +201,7 @@ int pkeKeygen(uint8_t pk_byte[5214], uint8_t sk_byte[16], uint8_t sigma_byte[16]
     free(S_T);
     //dotMatMat A and S
     dotMatMat(B, A, d, d, S, n_bar, d);
-    //round B 
+    //round B, I am going back to this while working on decap, and I am not entirely sure why the rounding constant was set as 4, but don't have enough info to verify/change it 
     round_matrix(B, (size_t)d * n_bar, n, q, p_bits, 4);
     //pack_pk with sigma and B_b
     pack_pk(sigma_byte, B, pk_byte);

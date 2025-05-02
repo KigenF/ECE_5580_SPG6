@@ -1,5 +1,65 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include "shake.h"
+#include "oryx/xof/cshake.h"
+
+#define len_tau_2 2048
+#define d 594
+#define n 1
+#define k 594 // k = d/n.
+#define kappa_bits 16
+#define q 8192
+#define n_bar 7
+#define m_bar 7
+#define h 238
+#define p_bits 10
+#define t_bits 7
+#define _b_bits 3
+#define cipher_bits 5236
+#define mu 43
+#define sk_bits 16
+
+#define SHAKE128_RATE 168
+#define SHAKE256_RATE 136
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define LITTLE_ENDIAN16(x) (x)
+#else
+#define LITTLE_ENDIAN16(x) ( \
+    (((x) & 0xFF00U) >> 8) |  \
+    (((x) & 0x00FFU) << 8)    \
+)
+#endif
+
+typedef CshakeContext cshake_ctx;
+// Context for Oryx 
+typedef struct {
+    cshake_ctx generator_ctx; 
+    uint8_t output[SHAKE128_RATE > SHAKE256_RATE ? SHAKE128_RATE : SHAKE256_RATE]; 
+    size_t index;
+    void (* generate)(uint8_t *output, const size_t output_len);
+} drbg_ctx;
+
+static drbg_ctx ctx;
+
+
+
+void generate_cshake128(uint8_t *output, const size_t output_len) {
+    size_t i, j;
+
+    i = ctx.index;
+    for (j = 0; j < output_len; j++) {
+        if (i >= SHAKE128_RATE) {
+            // if(cSHAKE128_Squeeze(&ctx.generator_ctx, ctx.output, SHAKE128_RATE * 8) !=0){
+            //     abort();
+            // }
+            cshakeSqueeze(&ctx.generator_ctx, ctx.output, SHAKE128_RATE * 8);
+            i = 0;
+        }
+        output[j] = ctx.output[i++];
+    }
+    ctx.index = i;
+}
 
 void *checked_malloc(size_t size) {
 	void *tmp = malloc(size);
@@ -41,3 +101,78 @@ int dotMatMat(uint16_t *matrix_out, uint16_t *matrix1, const uint16_t m1_rows, c
     return 0;
 }
 
+static int round_element(uint16_t *x, const uint16_t a_bits, const uint16_t b_bits, const uint16_t b_mask, const uint16_t rounding_constant) {
+    const uint16_t shift = (uint16_t) (a_bits - b_bits);
+    *x = (uint16_t) (*x + rounding_constant);
+    *x = (uint16_t) (*x >> shift);
+    *x &= b_mask;
+    return 0;
+}
+
+int round_matrix(uint16_t *matrix, const size_t len, const size_t els, const uint16_t a, const uint16_t b, const uint16_t rounding_constant) {
+    size_t i;
+
+    uint16_t b_mask = (uint16_t) (((uint16_t) 1 << b) - 1);
+    for (i = 0; i < len * els; ++i) {
+        round_element(matrix + i, a, b, b_mask, rounding_constant);
+    }
+
+    return 0;
+}
+
+static int create_secret_vector(uint16_t *vector, const uint16_t len) {
+    size_t j;
+    uint16_t idx;
+    const uint32_t range_divisor = (uint32_t) (0x10000 / len); \
+    const uint32_t range_limit = len * range_divisor;
+    uint16_t rnd;
+    uint8_t srnd; 
+
+    memset(vector, 0, sizeof(vector) * len);
+
+    for (j = 0; j < h; ++j) {
+        do {
+            // idx = drbg_sampler16(len);
+            do {
+                // drbg(&rnd, sizeof (rnd));
+                ctx.generate(&srnd, sizeof(rnd));
+                rnd = (uint16_t)(srnd);
+                rnd = (uint16_t) LITTLE_ENDIAN16(rnd);
+            } while (rnd >= range_limit);
+            rnd = (uint16_t) (rnd / range_divisor);
+            idx = rnd;
+        } while (vector[idx] != 0);
+        vector[idx] = (j & 1) ? -1 : 1;
+    }
+
+    return 0;
+}
+
+void create_S_T(uint8_t *in, uint16_t *out){
+    size_t i;
+    const uint16_t len = (uint16_t) (k * n);
+	uint8_t *sk = in;
+	uint16_t *S_T = out;
+
+    /* Initialize drbg */
+    // drbg_init(sk, kappa_bits);
+    // if(cSHAKE128_Initialize(&ctx.generator_ctx, 0, NULL, 0, NULL, 0) != 0){
+    if(cshakeInit(&ctx.generator_ctx, 0, NULL, 0, NULL, 0)){
+        abort();
+    }
+    // if (cSHAKE128_Update(&ctx.generator_ctx, sk, kappa_bits * 8) != 0) {
+	// 	abort();
+	// }
+    cshakeAbsorb(&ctx.generator_ctx, sk, kappa_bits * 8);
+	// if (cSHAKE128_Final(&ctx.generator_ctx, NULL) != 0) {
+	// 	abort();
+	// }
+    cshakeFinal(&ctx.generator_ctx);
+    ctx.index = SHAKE128_RATE;
+    ctx.generate = &generate_cshake128;
+
+    /* Create rows of sparse vectors */
+    for (i = 0; i < n_bar; ++i) {
+        create_secret_vector(&S_T[i * len], len);
+    }
+}
