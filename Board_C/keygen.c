@@ -63,7 +63,11 @@ static const uint8_t permutation_customization[2] = {0, 1};
 static int permutation_tau_2(uint32_t *row_disp, const unsigned char *seed){
     uint32_t i;
     uint16_t rnd;
-    uint8_t *v = calloc(len_tau_2, 1), tmp_rnd;
+    // uint8_t *v = calloc(len_tau_2, 1), tmp_rnd;
+    uint8_t v[len_tau_2], tmp_rnd;
+    for(i=0;i<len_tau_2;i++){
+        v[i] = 0;
+    }
 
     // drbg_init_customization(seed, kappa_bits, permutation_customization, sizeof (permutation_customization));
     
@@ -108,15 +112,15 @@ static int permutation_tau_2(uint32_t *row_disp, const unsigned char *seed){
 
 void create_A(uint8_t *sigma, uint16_t *A) {
     uint32_t i;
-    uint16_t *A_master = NULL;
-    uint32_t *A_permutation = NULL;
+    uint16_t A_master[len_tau_2 + d];
+    uint32_t A_permutation[k];
     const uint16_t els_row = (uint16_t) (k * n);
 
     // len_a = (size_t) (k * k * n);
 
     /* Create A/A_Master*/
     //formerly a checked malloc, but may need to replace because of heap limitations
-	A_master = malloc((size_t) (len_tau_2 + d) * sizeof (*A_master));
+	// A_master = malloc((size_t) (len_tau_2 + d) * sizeof (*A_master)); //Changed to an array
 
 	// create_A_master(sigma, A_master);, actually drbg_sampler16_2_once
     // Attempt to replace craete_A_master(), which simply calls drbg_sampler16_2_once
@@ -128,7 +132,7 @@ void create_A(uint8_t *sigma, uint16_t *A) {
 	memcpy(A_master + len_tau_2, A_master, d * sizeof (*A_master));
 
     /* Compute and apply the permutation to get A */
-	A_permutation = malloc(k * sizeof (*A_permutation));
+	// A_permutation = malloc(k * sizeof (*A_permutation));
 
 	/* Compute and apply permutation */
 	permutation_tau_2(A_permutation, sigma);
