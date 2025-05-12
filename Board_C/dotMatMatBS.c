@@ -4,7 +4,7 @@
 #include "cycles.h"
 #include <time.h>
 
-#define MAX_BITS 16
+#define MAX_BITS 13
 
 void generateRandomMatrix(uint16_t *matrix, uint16_t rows, uint16_t cols, uint16_t max_val) {
     for (uint16_t i = 0; i < rows; ++i) {
