@@ -5,6 +5,7 @@
 #include <stdbool.h>
 // #include "keccak_generic32/libXKCP.a.headers/KeccakHash.h"
 // #include "keccak_generic32/libXKCP.a.headers/SP800-185.h"
+#include "generalFunctions_optimized.h"
 #include "generalFunctions.h"
 #include "shake.h"
 #include "oryx/xof/cshake.h"
@@ -204,7 +205,8 @@ int pkeKeygen(uint8_t pk_byte[5214], uint8_t sk_byte[16], uint8_t sigma_byte[16]
     transpose(S_T, S, n_bar, d);
     free(S_T);
     //dotMatMat A and S
-    dotMatMat(B, A, d, d, S, n_bar, d);
+    // dotMatMat(B, A, d, d, S, n_bar, d);
+    dotMatMatBitslice(B, A, d, d, S, n_bar, d, 13);
     //round B, I am going back to this while working on decap, and I am not entirely sure why the rounding constant was set as 4, but don't have enough info to verify/change it 
     round_matrix(B, (size_t)d * n_bar, n, q, p_bits, 4);
     //pack_pk with sigma and B_b

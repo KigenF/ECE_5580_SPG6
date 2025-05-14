@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "generalFunctions.h"
+#include "generalFunctions_optimized.h"
 #include "shake.h"
 #include "oryx/xof/cshake.h"
 
@@ -196,7 +197,8 @@ void r5_cpa_pke_decrypt(uint16_t *message, uint16_t *ciphertext, uint16_t *share
     unpack_ct(U_T, v, ciphertext);
     transpose(U_T, U, m_bar, d);
     decompress_matrix(v_p_bits, v);
-    dotMatMat(X_Prime, S_T, n_bar, d, U, d, m_bar);
+    // dotMatMat(X_Prime, S_T, n_bar, d, U, d, m_bar);
+    dotMatMatBitslice(X_Prime, S_T, n_bar, d, U, d, m_bar, 10);
     diff_msg(m2, v_p_bits, X_Prime);
     //using h for rounding constant, may need to go back and verify this later
     round_matrix(m2, mu, 1, p_bits, _b_bits, h);
